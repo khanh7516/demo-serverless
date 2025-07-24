@@ -1,0 +1,57 @@
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
+org: khanhng
+# "service" is the name of this project. This will also be added to your AWS resource names.
+service: authService
+
+provider:
+  name: aws
+  runtime: nodejs22.x
+  region: ap-southeast-1
+  iamRoleStatements: #IAM role statements to allow the Lambda function to access DynamoDB
+    - Effect: Allow
+      Action:
+        - dynamodb:PutItem
+      Resource: arn:aws:dynamodb:ap-southeast-1:302263050402:table/Users #Allows access to the Users table
+
+resources:
+  Resources:
+    UsersTable:
+      Type: AWS::DynamoDB::Table #Defines a dynamodb table resource
+      Properties: 
+        TableName: Users #name of the table where users are stored
+        BillingMode: PAY_PER_REQUEST #automaticaly scales read/write capacity base on usage
+        AttributeDefinitions: 
+          - AttributeName: userId #partition key(unique id)
+            AttributeType: S #String
+        KeySchema: 
+          - AttributeName: userId #Defines userId as the primary key
+            KeyType: HASH #partition key
+          
+functions:
+  signUp:
+    handler: handlers/signUp.signUp
+    events:
+      - httpApi:
+          path: /signUp
+          method: post
+
+  confirmSignUp:
+    handler: handlers/confirmSignUp.confirmSignUp
+    events:
+      - httpApi:
+          path: /confirmSignUp
+          method: post
+
+  signIn:
+    handler: handlers/signIn.signIn
+    events:
+      - httpApi:
+          path: /signIn
+          method: post
+
+  signOut:
+    handler: handlers/signOut.signOut
+    events:
+      - httpApi:
+          path: /signOut
+          method: post

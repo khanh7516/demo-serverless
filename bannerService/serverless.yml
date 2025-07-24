@@ -1,0 +1,62 @@
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
+org: khanhng
+# "service" is the name of this project. This will also be added to your AWS resource names.
+service: bannerService
+
+provider:
+  name: aws
+  runtime: nodejs22.x
+  region: ap-southeast-1
+  environment:
+    BUCKET_NAME: banner-bucket # Environment variable for the S3 bucket name
+    DYNAMO_TABLE: Banners
+  iamRoleStatements: # IAM role statements to allow the Lambda function to access S3
+    - Effect: Allow
+      Action:
+        - s3:PutObject
+      Resource: arn:aws:s3:::banner-bucket/* # Allows access to the banner-bucket
+    - Effect: Allow
+      Action:
+        - dynamodb:PutItem
+      Resource: arn:aws:dynamodb:ap-southeast-1:302263050402:table/Banners # Allows access to the Banners table
+
+resources:
+  Resources:
+    BannerImagesBucket:
+      Type: AWS::S3::Bucket # Defines an S3 bucket resource
+      Properties:
+        BucketName: banner-bucket # Name of the S3 bucket where banners will be stored
+        CorsConfiguration: # CORS configuration for the bucket
+          CorsRules:
+            - AllowedMethods:
+                - PUT
+              AllowedOrigins:
+                - '*' # Allows all origins to put objects in the bucket
+              AllowedHeaders:
+                - '*' # Allows all headers
+    BannersTable:
+      Type: AWS::DynamoDB::Table # Defines a DynamoDB table resource
+      Properties:
+        TableName: Banners # Name of the table where banner metadata will be stored
+        BillingMode: PAY_PER_REQUEST # Automatically scales read/write capacity based on usage
+        AttributeDefinitions:
+          - AttributeName: fileName # Partition key (unique id)
+            AttributeType: S # String
+        KeySchema:
+          - AttributeName: fileName # Defines fileName as the primary key
+            KeyType: HASH # Partition key
+
+functions:
+  uploadBanner:
+    handler: handlers/uploadBanner.uploadBanner
+    events:
+      - httpApi:
+          path: /upload-banner
+          method: post
+  confirmUpload:
+    handler: handlers/confirmUpload.confirmUpload
+    events:
+      - s3: # Triggered when an object is created in the S3 bucket
+          bucket: banner-bucket
+          event: s3:ObjectCreated:Put
+          existing: true # Use an existing bucket
