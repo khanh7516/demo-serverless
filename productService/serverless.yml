@@ -1,0 +1,93 @@
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
+org: khanhng
+# "service" is the name of this project. This will also be added to your AWS resource names.
+service: productService
+frameworkVersion: "4"
+
+provider:
+  name: aws
+  runtime: nodejs22.x
+  region: ap-southeast-1
+  environment:
+    BUCKET_NAME: product-images-bucket # Environment variable for the S3 bucket name
+    DYNAMO_TABLE: Products # Environment variable for the DynamoDB table name
+    REGION: ap-southeast-1 # Environment variable for the AWS region
+    SNS_TOPIC_ARN: arn:aws:sns:ap-southeast-1:302263050402:ProductCleanupTopic # Environment variable for the SNS topic ARN
+  iamRoleStatements: # IAM role statements to allow the Lambda function to access S3 and DynamoDB
+    - Effect: Allow
+      Action:
+        - s3:PutObject # Allows the function to put objects in the S3 bucket
+      Resource: arn:aws:s3:::product-images-bucket/* # Allows access to the product-images-bucket
+    - Effect: Allow
+      Action:
+        - dynamodb:PutItem # Allows the function to put items in the DynamoDB table
+        - dynamodb:UpdateItem # Allows the function to update items in the DynamoDB table
+        - dynamodb:ScanItem # Allows the function to scan items in the DynamoDB table
+        - dynamodb:DeleteItem # Allows the function to delete items in the DynamoDB table
+      Resource: arn:aws:dynamodb:ap-southeast-1:302263050402:table/Products # Allows access to the Products table
+  httpApi:
+    authorizers:
+      myCognitoAuth: #Custom name for Cognito Authorization(used in routes)
+        identitySource: $request.header.Authorization #Extract JWT token from Authorization
+        #header (used for validation)
+        issuerUrl: https://cognito-idp.ap-southeast-1.amazonaws.com/ap-southeast-1_Kx65YKYXy
+        #Url of your Cognito user pool(Needed to  verify tokens).
+        audience:
+          - 19pg1k8ns62j50bvnjn8blfcqf
+          #Cognito App client ID(ensures tokens come from the right app).
+
+resources:
+  Resources:
+    ProductTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: Products
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+    ProductImagesBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: product-images-bucket
+        CorsConfiguration:
+          CorsRules:
+            - AllowedMethods:
+                - PUT
+              AllowedOrigins:
+                - '*'
+              AllowedHeaders:
+                - '*'
+    ProductCleanupTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: ProductCleanupTopic # Name of the SNS topic for product cleanup notifications
+    ProductCleanupSubscription:
+      Type: AWS::SNS::Subscription
+      Properties:
+        TopicArn: arn:aws:sns:ap-southeast-1:302263050402:ProductCleanupTopic # ARN of the SNS topic
+        Protocol: email # Protocol for the subscription
+        Endpoint: khanhngo7516@gmail.com
+functions:
+  getUploadUrl:
+    handler: handlers/getUploadUrl.getUploadUrl
+    events:
+      - httpApi:
+          path: /get-upload-url
+          method: post
+          authorizer: myCognitoAuth # Use the custom Cognito authorizer for this route
+  updateProductImage:
+    handler: handlers/updateProductImage.updateProductImage
+    events:
+      - s3:
+          bucket: product-images-bucket
+          event: s3:ObjectCreated:Put
+          existing: true # Use an existing bucket
+  cleanupProducts:
+    handler: handlers/cleanupProducts.cleanupProducts
+    events:
+      - scheduled:
+          rate: rate(2 minutes) # Run this function once a day

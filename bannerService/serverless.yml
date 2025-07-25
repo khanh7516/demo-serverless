@@ -10,6 +10,7 @@ provider:
   environment:
     BUCKET_NAME: banner-bucket # Environment variable for the S3 bucket name
     DYNAMO_TABLE: Banners
+    REGION: ap-southeast-1 # Environment variable for the AWS region
   iamRoleStatements: # IAM role statements to allow the Lambda function to access S3
     - Effect: Allow
       Action:

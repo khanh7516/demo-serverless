@@ -1,0 +1,83 @@
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
+org: khanhng
+# "service" is the name of this project. This will also be added to your AWS resource names.
+service: categoryService
+
+provider:
+  name: aws
+  runtime: nodejs22.x
+  environment:
+    BUCKET_NAME: category-images-bucket # Environment variable for the S3 bucket name
+    DYNAMO_TABLE: Categories # Environment variable for the DynamoDB table name
+    SNS_TOPIC_ARN: arn:aws:sns:ap-southeast-1:302263050402:CategoryCleanupTopic # Environment variable for the SNS topic ARN
+  region: ap-southeast-1 # AWS region where the service will be deployed
+  iamRoleStatements: # IAM role statements to allow the Lambda function to access S3 and DynamoDB
+    - Effect: Allow
+      Action:
+        - s3:PutObject # Allows the function to put objects in the S3 bucket
+      Resource: arn:aws:s3:::category-images-bucket/* # Allows access to the category-images-bucket
+    - Effect: Allow
+      Action:
+        - dynamodb:PutItem # Allows the function to put items in the DynamoDB table
+        - dynamodb:UpdateItem # Allows the function to update items in the DynamoDB table
+        - dynamodb:ScanItem # Allows the function to scan items in the DynamoDB table
+        - dynamodb:DeleteItem # Allows the function to delete items in the DynamoDB table
+      Resource: arn:aws:dynamodb:ap-southeast-1:302263050402:table/Categories # Allows access to the Categories table
+    - Effect: Allow
+      Action:
+        - sns:Publish # Allows the function to publish messages to the SNS topic
+      Resource: arn:aws:sns:ap-southeast-1:302263050402:CategoryCleanupTopic # Allows access to the CategoryCleanupTopic SNS topic
+resources:
+  Resources:
+    CategoryImagesBucket:
+      Type: AWS::S3::Bucket # Defines an S3 bucket resource
+      Properties:
+        BucketName: category-images-bucket # Name of the S3 bucket where category images will be stored
+        CorsConfiguration: # CORS configuration for the bucket
+          CorsRules:
+            - AllowedMethods:
+                - PUT
+              AllowedOrigins:
+                - '*' # Allows all origins to put objects in the bucket
+              AllowedHeaders:
+                - '*' # Allows all headers
+    CategoryTable:
+      Type: AWS::DynamoDB::Table # Defines a DynamoDB table resource
+      Properties:
+        TableName: Categories # Name of the table where category metadata will be stored
+        BillingMode: PAY_PER_REQUEST # Automatically scales read/write capacity based on usage
+        AttributeDefinitions:
+          - AttributeName: fileName # Partition
+            AttributeType: S # String
+        KeySchema:
+          - AttributeName: fileName # Defines fileName as the primary key
+            KeyType: HASH # Partition key
+    CategoryCleanupTopic:
+      Type: AWS::SNS::Topic # Defines an SNS topic for category cleanup notifications
+      Properties:
+        TopicName: CategoryCleanupTopic # Name of the SNS topic
+    CategoryCleanupSubscription:
+      Type: AWS::SNS::Subscription # Defines a subscription to the SNS topic
+      Properties:
+        TopicArn: arn:aws:sns:ap-southeast-1:302263050402:CategoryCleanupTopic # ARN of the SNS topic
+        Protocol: email # Protocol for the subscription
+        Endpoint: khanhngo7516@gmail.com # Lambda function ARN to receive notifications
+functions:
+  getUploadUrl: # Lambda function to get the upload URL for category images
+    handler: handles/getUploadUrl.getUploadUrl # Specifies the handler function in the code
+    events:
+      - httpApi:
+        path: /get-upload-url
+        method: post
+  updateCategoryImage: # Lambda function to update the category image
+    handler: handles/updateCategoryImage.updateCategoryImage # Specifies the handler function in the code
+    events:
+      - s3:
+          bucket: category-images-bucket
+          event: s3:ObjectCreated:Put
+          existing: true
+  cleanupCategories: # Lambda function to clean up categories
+    handler: handles/cleanupCategories.cleanupCategories # Specifies the handler function in the code
+    events:
+      - schedule: # Scheduled event to trigger the cleanup function
+          rate: rate(2 minutes) # Runs every 2 minutes

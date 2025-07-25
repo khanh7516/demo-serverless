@@ -1,8 +1,9 @@
 //import aws cognito sdk
 import {
-  GlobalSignOutCommand
+    GlobalSignOutCommand
 } from '@aws-sdk/client-cognito-identity-provider';
-import {client} from '../../common/cognito-client';
+
+const client = new DynamoDBClient({ region: process.env.REGION });
 
 exports.signOut = async (event) => {
     const {accessToken} = JSON.parse(event.body);

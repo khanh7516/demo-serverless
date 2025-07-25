@@ -1,10 +1,9 @@
-//import aws cognito sdk
-import {CLIENT_ID} from '../../common/constants'
 import {
-  SignUpCommand
+    SignUpCommand
 } from '@aws-sdk/client-cognito-identity-provider';
-import {client} from '../../common/cognito-client';
-import UserModel from '../models/UserModel';
+
+const client = new DynamoDBClient({ region: process.env.REGION });
+const CLIENT_ID = process.env.COGNITO_CLIENT_ID; // The Cognito User Pool Client ID
 
 //Export sign-up function
 exports.signUp = async (event) => {
@@ -16,7 +15,7 @@ exports.signUp = async (event) => {
         Username: email,
         Password: password,
         UserAttributes: //additionnal user attributes
-        [ 
+        [
             {
                 Name: 'email',
                 Value: email

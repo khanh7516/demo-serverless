@@ -1,4 +1,4 @@
-import {DynamoDBClient, PutItemCommand} from '@aws-sdk/client-dynamodb';
+import {DynamoDBClient} from '@aws-sdk/client-dynamodb';
 
 
 //Init DynamoDB client

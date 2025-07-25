@@ -1,8 +1,9 @@
-import {CLIENT_ID} from '../../common/constants'
 import {
-  InitiateAuthCommand
+    InitiateAuthCommand
 } from '@aws-sdk/client-cognito-identity-provider';
-import {client} from '../../common/cognito-client';
+
+const client = new DynamoDBClient({ region: process.env.REGION });
+const CLIENT_ID = process.env.CLIENT_ID; // The Cognito User Pool Client ID
 
 exports.signIn = async (event) => {
     const {email, password} = JSON.parse(event.body);

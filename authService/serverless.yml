@@ -12,7 +12,9 @@ provider:
       Action:
         - dynamodb:PutItem
       Resource: arn:aws:dynamodb:ap-southeast-1:302263050402:table/Users #Allows access to the Users table
-
+  environment:
+    CLIENT_ID: ${ssm:/CLIENT_ID} 
+    REGION: ap-southeast-1 # Environment variable for the AWS region
 resources:
   Resources:
     UsersTable:
