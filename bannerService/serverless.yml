@@ -19,6 +19,7 @@ provider:
     - Effect: Allow
       Action:
         - dynamodb:PutItem
+        - dynamodb:ScanItem
       Resource: arn:aws:dynamodb:ap-southeast-1:302263050402:table/Banners # Allows access to the Banners table
 
 resources:
@@ -61,3 +62,9 @@ functions:
           bucket: banner-bucket
           event: s3:ObjectCreated:Put
           existing: true # Use an existing bucket
+  getBanners:
+    handler: handlers/getBanners.getBanners
+    events:
+      - httpApi:
+          path: /banners
+          method: get

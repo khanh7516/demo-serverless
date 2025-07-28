@@ -1,0 +1,101 @@
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
+org: khanhng
+# "service" is the name of this project. This will also be added to your AWS resource names.
+service: orderService
+
+plugins:
+  - serverless-step-functions # Plugin to support step functions
+
+provider:
+  name: aws
+  runtime: nodejs22.x
+  environment:
+    DYNAMO_TABLE: Orders # Environment variable for the DynamoDB table name
+    REGION: ap-southeast-1 # Environment variable for the AWS region
+    SQS_QUEUE_URL: https://sqs.ap-southeast-1.amazonaws.com/302263050402/OrderQueue # Environment variable for the SQS queue URL
+
+  region: ap-southeast-1 # AWS region where the service will be deployed
+  httpApi:
+    authorizers:
+      myCognitoAuth: # Custom name for Cognito Authorization (used in routes)
+        identitySource: $request.header.Authorization # Extract JWT token from Authorization header (used for validation)
+        issuerUrl: https://cognito-idp.ap-southeast-1.amazonaws.com/ap-southeast-1_Kx65YKYXy # URL of your Cognito user pool (Needed to verify tokens).
+        audience:
+          - 19pg1k8ns62j50bvnjn8blfcqf # Cognito App client ID (ensures tokens come from the right app).
+  iamRoleStatements: # IAM role statements to allow the Lambda function to access DynamoDB
+    - Effect: Allow
+      Action:
+        - dynamodb:PutItem # Allows the function to put items in the DynamoDB table
+        - dynamodb:UpdateItem # Allows the function to update items in the DynamoDB table
+        - sqs:SendMessage # Allows the function to send messages to the SQS queue
+        - sqs:ReceiveMessage # Allows the function to receive messages from the SQS queue
+        - sqs:DeleteMessage # Allows the function to delete messages from the SQS queue
+        - states:StartExecution # Allows the function to start executions of the Step Functions state machine
+        - ses:SendEmail # Allows the function to send emails using SES
+      Resource: 
+      # Allows access to the Orders table and OrderQueue SQS queue using Fn::GetAtt to get their ARNs
+        - Fn::GetAtt: [OrderTable, Arn] # Allows access to the Orders table
+        - Fn::GetAtt: [OrderQueue, Arn] # Allows access to the OrderQueue SQS queue
+        - Fn::GetAtt: [OrderProcessingStateMachine, Arn] # Allows access to the OrderProcessingStateMachine Step Functions state machine 
+        - Fn::GetAtt: [OrderNotificationEmail, Arn] # Allows access to the OrderNotificationEmail SES email identity
+resources:
+  Resources:
+    OrderTable:
+      Type: AWS::DynamoDB::Table # Defines a DynamoDB table resource
+      Properties:
+        TableName: Orders # Name of the table where order metadata will be stored
+        BillingMode: PAY_PER_REQUEST # Automatically scales read/write capacity based on usage
+        AttributeDefinitions:
+          - AttributeName: id # Partition key
+            AttributeType: S # String
+        KeySchema:
+          - AttributeName: id # Defines orderId as the primary key
+            KeyType: HASH # Partition key
+    OrderQueue:
+      Type: AWS::SQS::Queue # Defines an SQS queue for order processing
+      Properties:
+        QueueName: OrderQueue # Name of the SQS queue
+    OrderNotificationEmail:
+      Type: AWS::SES::EmailIdentity # Defines an SES email identity for sending order notifications
+      Properties:
+        EmailIdentity: khanhngo7516@gmail.com
+        
+functions:
+  placeOrder: # Lambda function to place an order
+    handler: handlers/placeOrder.placeOrder # Specifies the handler function in the code
+    environment:
+      STEP_FUNCTION_ARN: 
+        Ref: OrderProcessingStateMachine # Reference to the state machine ARN
+    events:
+      - httpApi:
+          path: /orders
+          method: post # HTTP POST method to place an order
+  processOrder: # Lambda function to process orders from the SQS queue
+    handler: handlers/processOrder.processOrder # Specifies the handler function in the code
+    events: # Trigger this function when messages are sent to the SQS queue
+      - sqs:
+          arn: Fn::GetAtt: [OrderQueue, Arn] # ARN of the SQS queue
+  updateOrderStatus: # Lambda function to update the status of an order
+    handler: handlers/updateOrderStatus.updateOrderStatus # Specifies the handler function in the code
+
+
+stepFuntions: # Define the state machine for order processing
+  stateMachines:
+    OrderProcessingStateMachine: # Name of the state machine
+      name: OrderProcessingStateMachine # Name of the state machine
+      definition: # Actual struture (state transitions) of the state machine
+        Comment: "Order processing with status update" #Comment to describe what this state machine does
+        StartAt: UpdateStatusToProcessing # The first state to start the execution
+        States:
+          UpdateStatusToProcessing: # State to update the order status to processing
+            Type: Task # This state is a task that performs some work
+            Resource:
+              Fn::GetAtt: [updateOrderStatus, Arn] # ARN of the Lambda function to update order status
+            Next: NotifyUser # After this task, move to the next state
+          NotifyUser: # State to notify the user about the order status
+            Type: Pass # `Pass` state is used to pass the execution to the next state without doing any work
+            Resource:
+              Fn::GetAtt: [notifyUser, Arn] # ARN of the Lambda function to notify the user
+            End: true # This is the end of the state machine execution
+
+

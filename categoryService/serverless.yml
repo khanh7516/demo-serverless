@@ -81,3 +81,9 @@ functions:
     events:
       - schedule: # Scheduled event to trigger the cleanup function
           rate: rate(2 minutes) # Runs every 2 minutes
+  getAllCategories: # Lambda function to get all categories
+    handler: handles/getAllCategories.getAllCategories # Specifies the handler function in the code
+    events:
+      - httpApi:
+          path: /categories
+          method: get # HTTP GET method to retrieve all categories

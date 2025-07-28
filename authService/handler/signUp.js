@@ -8,7 +8,6 @@ const CLIENT_ID = process.env.COGNITO_CLIENT_ID; // The Cognito User Pool Client
 //Export sign-up function
 exports.signUp = async (event) => {
     const {email, password, fullName} = JSON.parse(event.body);
-    const username = fullName.replace(/\s+/g, '_'); //replace spaces with underscores
     //configure parameters for cognito SignupCommand
     const params = {
         ClientId: CLIENT_ID,
@@ -33,7 +32,7 @@ exports.signUp = async (event) => {
         await client.send(command);
 
         //Create user in DynamoDB
-        const user = new UserModel(email, username);
+        const user = new UserModel(email, fullName);
         await user.save();
 
         return {

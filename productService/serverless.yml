@@ -25,6 +25,11 @@ provider:
         - dynamodb:ScanItem # Allows the function to scan items in the DynamoDB table
         - dynamodb:DeleteItem # Allows the function to delete items in the DynamoDB table
       Resource: arn:aws:dynamodb:ap-southeast-1:302263050402:table/Products # Allows access to the Products table
+    - Effect: Allow
+      Action:
+        - sns:Publish # Allows the function to publish messages to the SNS topic
+      Resource: arn:aws:sns:ap-southeast-1:302263050402:ProductCleanupTopic # Allows access to the ProductCleanupTopic SNS topic
+
   httpApi:
     authorizers:
       myCognitoAuth: #Custom name for Cognito Authorization(used in routes)
@@ -91,3 +96,10 @@ functions:
     events:
       - scheduled:
           rate: rate(2 minutes) # Run this function once a day
+  getApprovedProducts:
+    handler: handlers/getApprovedProducts.getApprovedProducts
+    events:
+      - httpApi:
+          path: /get-approved-products
+          method: get
+          authorizer: myCognitoAuth # Use the custom Cognito authorizer for this route
